@@ -162,9 +162,9 @@ class Config(commands.Cog):
             with open(Config.server_data, 'w') as f:
                 json.dump(data ,f, indent=4)
                 self.member_join_channel_id = channel.id
-                await ctx.send(f"Successfully set welcoming channel to {channel.mention}")
+                await ctx.reply(f"Successfully set welcoming channel to {channel.mention}")
         else:
-            await ctx.send("You do not have permission to do that.")
+            await ctx.reply("You do not have permission to do that.")
 
 
     @set_welcome.error
@@ -172,11 +172,11 @@ class Config(commands.Cog):
 
         # in case the user types a non-existant channel
         if isinstance(error, commands.ChannelNotFound):
-            await ctx.send("Couldn't find this channel.")
+            await ctx.reply("Couldn't find this channel.")
 
         # in case the user doesn't specify a channel (missing argument)
         elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send("Please specify a channel.")
+            await ctx.reply("Please specify a channel.")
             
 
 class MyBot(commands.Bot):
