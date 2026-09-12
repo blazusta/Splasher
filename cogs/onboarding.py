@@ -69,8 +69,25 @@ class Config(commands.Cog):
                 ]
 
                 random_farewell = random.choice(farewell)
-                await channel.send(random_farewell)
-                await channel.send(f"We have now {member.guild.member_count} members 😟")
+                
+                embed = discord.Embed(
+                    title=f"Leaving {member.guild.name.upper()}",
+                    description=random_farewell,
+                    color=discord.Color.red(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.set_thumbnail(url=member.display_avatar.url)
+                embed.add_field(
+                    name="Remaining Members", 
+                    value=f"#{member.guild.member_count}", 
+                    inline=True
+                )
+                embed.set_footer(
+                    text=f"User ID: {member.id}",
+                    icon_url=member.guild.icon.url if member.guild.icon else None,
+                )
+
+                await channel.send(embed=embed)
 
 
     @commands.Cog.listener()
@@ -82,7 +99,7 @@ class Config(commands.Cog):
             return
 
         try:
-            await member.send(f"Welcome to {member.guild.name.upper()} {member.mention} 🌊")
+            await member.send(f"Welcome to {member.guild.name.upper()} {member.mention}")
         except discord.Forbidden:
             # If the user does not allow DMs, pass (403 forbidden)
             pass
@@ -107,10 +124,32 @@ class Config(commands.Cog):
                 f"{member.mention} has joined the party 🔥",
                 f"{member.mention} stumbled upon greatness..."
             ]
-
             random_welcoming = random.choice(welcomings)
-            await channel.send(random_welcoming)
-            await channel.send(f"We have now {member.guild.member_count} members 🎉")
+            
+            embed = discord.Embed(
+                title=f"Welcome to {member.guild.name.upper()}",
+                description=random_welcoming,
+                color=0x00A8FF,
+                timestamp=datetime.now(timezone.utc)
+            )
+
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.add_field(
+                name="Account Created", 
+                value=member.created_at.strftime("%Y / %m / %d"), 
+                inline=True
+            )
+            embed.add_field(
+                name="Member Count", 
+                value=f"#{member.guild.member_count}", 
+                inline=True
+            )
+            embed.set_footer(
+                text=f"User ID: {member.id}",
+                icon_url=member.guild.icon.url if member.guild.icon else None,
+            )
+
+            await channel.send(embed=embed)
 
 
     @commands.command(name="set_welcome")
