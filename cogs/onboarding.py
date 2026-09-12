@@ -40,21 +40,26 @@ class Config(commands.Cog):
 
             # seconds < 5: because it takes time for the discord bot to retreive event data
             # and notify the bot through the websocket.
-            async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.ban):
-                timedelta = current_time - entry.created_at
-                seconds = timedelta.total_seconds()
+            try:
+                async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.ban):
+                    timedelta = current_time - entry.created_at
+                    seconds = timedelta.total_seconds()
 
-                if member.id == entry.target.id and seconds < 5:
-                    was_kicked_or_banned = True
-                    break
-            
-            async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.kick):
-                timedelta = current_time - entry.created_at
-                seconds = timedelta.total_seconds()
+                    if member.id == entry.target.id and seconds < 5:
+                        was_kicked_or_banned = True
+                        break
+                
+                async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.kick):
+                    timedelta = current_time - entry.created_at
+                    seconds = timedelta.total_seconds()
 
-                if member.id == entry.target.id and seconds < 5:
-                    was_kicked_or_banned = True
-                    break
+                    if member.id == entry.target.id and seconds < 5:
+                        was_kicked_or_banned = True
+                        break
+            except discord.Forbidden:
+                # If the bot isn't authorized to access audit logs
+                # catch the error and pass
+                pass
 
 
             if not was_kicked_or_banned:
@@ -85,9 +90,14 @@ class Config(commands.Cog):
             # If the user does not allow DMs, pass (400 bad request)
             pass
         
-        default_role = discord.utils.get(member.guild.roles, id=self.join_role_id)
-        if default_role:
-            await member.add_roles(default_role)
+        try:
+            default_role = discord.utils.get(member.guild.roles, id=self.join_role_id)
+            if default_role:
+                await member.add_roles(default_role)
+        except discord.Forbidden:
+            # If the bot isn't authorized to access server roles
+            # catch the error and pass
+            pass
 
         if channel:
             welcomings = [
@@ -115,7 +125,19 @@ class Config(commands.Cog):
                 self.member_join_channel_id = channel.id
                 await ctx.send(f"Successfully set welcoming channel to {channel.mention}")
         else:
-            await ctx.send(f"You do not have permission to do that.")
+            await ctx.send("You do not have permission to do that.")
+
+
+    @set_welcome.error
+    async def set_welcome_error(self, ctx, error):
+
+        # in case the user types a non-existant channel
+        if isinstance(error, commands.ChannelNotFound):
+            await ctx.send("Couldn't find this channel.")
+
+        # in case the user doesn't specify a channel (missing argument)
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send("Please specify a channel.")
             
 
 class MyBot(commands.Bot):
