@@ -19,6 +19,10 @@ async def start_bot():
 
             except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 print(f"Connection Failed: {e}\nRetrying...")
+
+                # Clear unclosed client session before next connecting attempt
+                if not bot.is_closed():
+                    await bot.close()
                 await asyncio.sleep(10)
                 
             except Exception as e:
@@ -29,6 +33,7 @@ async def start_bot():
         pass
 
     finally:
+        # Clear unclosed client session before shutting down the bot
         if not bot.is_closed():
             await bot.close()
 

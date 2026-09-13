@@ -14,6 +14,9 @@ class Config(commands.Cog):
             self.server_config = json.load(f)
 
 
+                            # [Config class events and commands]
+
+
     @commands.Cog.listener()
     async def on_ready(self):
         print(f"Successfully initiated. {self.bot.user.name} is ready to receive commands.")
@@ -196,6 +199,47 @@ class Config(commands.Cog):
             await ctx.reply("You do not have permission to do that.")
 
 
+    @commands.command(name="set_role")
+    @commands.guild_only()
+    async def set_role(self, ctx, role: discord.Role):
+        if ctx.author.guild_permissions.administrator:
+            # Is the role the admin wants to assign to member higher than bot role?
+            if role >= ctx.guild.me.top_role:
+                await ctx.reply(f"I cannot assign {role.mention} because it is higher than or equal to my highest role in the server hierarchy.")
+                return
+            
+            # Is the role the admin wants to assign to member a default role? (everyone, here)
+            # Is the role the admin wants to assign a bot-managed role? (Splasher)
+            if role.is_default() or role.managed:
+                await ctx.reply(f"You cannot set `@everyone | @here` or bot-managed roles as a default join role.")
+                return
+            
+            
+            guild_id = str(ctx.guild.id)
+            
+            with open(Config.server_data, 'r', encoding='utf-8') as f:
+                server_config = json.load(f)
+
+            if guild_id not in server_config:
+                server_config[guild_id] = {
+                    "member_join_channel_id": None,
+                    "join_role_id": None
+                }
+
+            server_config[guild_id]["join_role_id"] = role.id
+
+            with open(Config.server_data, 'w', encoding='utf-8') as f:
+                json.dump(server_config, f, indent=4)
+
+            self.server_config = server_config
+            await ctx.reply(f"Successfully set default join role to {role.mention}")
+        else:
+            await ctx.reply(f"You do not have permission to do that.")
+
+
+                        # [Handle event/command errors and exceptions]
+
+
     @set_welcome.error
     async def set_welcome_error(self, ctx, error):
 
@@ -211,6 +255,27 @@ class Config(commands.Cog):
         elif isinstance(error, commands.NoPrivateMessage):
             await ctx.reply("This command can only be used within servers.")
             
+
+    @set_role.error
+    async def set_role_error(self, ctx, error):
+
+        if isinstance(error, commands.RoleNotFound):
+            arg = str(error.argument)
+            # discord.Role in python either receives <@ or <@&
+            # Discord passes an argument that starts with <@ if it catches a member mention
+            # and passes an argument that starts with <@& if it catches a role mention
+            # discord.py handles the decoding, and it converts the argument based on
+            # what it starts with
+            if arg.startswith('<@') and not arg.startswith('<@&'):
+                await ctx.reply(f"This is not a role 🤦‍♂️")
+            else:
+                await ctx.reply("Couldn't find this role.")
+
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.reply("Please specify a role.")
+        elif isinstance(error, commands.NoPrivateMessage):
+            await ctx.reply("This command can only be used within servers.")
+
 
 class MyBot(commands.Bot):
     async def setup_hook(self):
