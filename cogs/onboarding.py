@@ -11,9 +11,7 @@ class Config(commands.Cog):
         self.bot = bot
 
         with open(Config.server_data, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            self.member_join_channel_id = data["member_join_channel_id"]
-            self.join_role_id = data["join_role_id"]
+            self.server_config = json.load(f)
 
 
     @commands.Cog.listener()
@@ -23,76 +21,97 @@ class Config(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
+
+        guild_id = str(member.guild.id)
+        guild_config = self.server_config.get(guild_id, {})
+
+        channel_id = guild_config.get("member_join_channel_id")
+        if not channel_id:
+            # if the channel_id was not found in the json file, return.
+            return
+        
+        channel = self.bot.get_channel(channel_id)
+        if not channel:
+            # if the channel is None (non-existent), return
+            return
         
         # to make sure the event is logged into the audit log
         # otherwise the event could be trigged before even it's logged
         # which can display a leaving message for a banned/kicked member
         await asyncio.sleep(0.5)
-        channel = self.bot.get_channel(self.member_join_channel_id)
+    
+        was_kicked_or_banned = False
+        current_time = datetime.now(timezone.utc)
 
-        if channel:
-            was_kicked_or_banned = False
-            current_time = datetime.now(timezone.utc)
+        # async loop that checks in the audit log whether the left member was banned or not
+        # timedelta is to confirm that the banned user was banned just now
+        # we check if the ban happened at the same time of the left member
 
-            # async loop that checks in the audit log whether the left member was banned or not
-            # timedelta is to confirm that the banned user was banned just now
-            # we check if the ban happened at the same time of the left member
+        # seconds < 5: because it takes time for the discord bot to retreive event data
+        # and notify the bot through the websocket.
+        try:
+            async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.ban):
+                timedelta = current_time - entry.created_at
+                seconds = timedelta.total_seconds()
 
-            # seconds < 5: because it takes time for the discord bot to retreive event data
-            # and notify the bot through the websocket.
-            try:
-                async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.ban):
-                    timedelta = current_time - entry.created_at
-                    seconds = timedelta.total_seconds()
-
-                    if member.id == entry.target.id and seconds < 5:
-                        was_kicked_or_banned = True
-                        break
+                if member.id == entry.target.id and seconds < 5:
+                    was_kicked_or_banned = True
+                    break
                 
-                async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.kick):
-                    timedelta = current_time - entry.created_at
-                    seconds = timedelta.total_seconds()
+            async for entry in member.guild.audit_logs(limit=3, action=discord.AuditLogAction.kick):
+                timedelta = current_time - entry.created_at
+                seconds = timedelta.total_seconds()
 
-                    if member.id == entry.target.id and seconds < 5:
-                        was_kicked_or_banned = True
-                        break
-            except discord.Forbidden:
-                # If the bot isn't authorized to access audit logs
-                # catch the error and pass
-                pass
+                if member.id == entry.target.id and seconds < 5:
+                    was_kicked_or_banned = True
+                    break
+        except discord.Forbidden:
+            # If the bot isn't authorized to access audit logs
+            # catch the error and pass
+            pass
 
 
-            if not was_kicked_or_banned:
-                farewell = [
-                    f"Why did you leave us? {member.name}",
-                    f"{member.name} has unfortunately left the server."
-                ]
+        if not was_kicked_or_banned:
+            farewell = [
+                f"Why did you leave us? {member.name}",
+                f"{member.name} has unfortunately left the server."
+            ]
 
-                random_farewell = random.choice(farewell)
+            random_farewell = random.choice(farewell)
                 
-                embed = discord.Embed(
-                    title=f"Leaving {member.guild.name.upper()}",
-                    description=random_farewell,
-                    color=discord.Color.red(),
-                    timestamp=datetime.now(timezone.utc)
-                )
-                embed.set_thumbnail(url=member.display_avatar.url)
-                embed.add_field(
-                    name="Remaining Members", 
-                    value=f"#{member.guild.member_count}", 
-                    inline=True
-                )
-                embed.set_footer(
-                    text=f"User ID: {member.id}",
-                    icon_url=member.guild.icon.url if member.guild.icon else None,
-                )
+            embed = discord.Embed(
+                title=f"Leaving {member.guild.name.upper()}",
+                description=random_farewell,
+                color=discord.Color.red(),
+                timestamp=datetime.now(timezone.utc)
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.add_field(
+                name="Remaining Members", 
+                value=f"#{member.guild.member_count}", 
+                inline=True
+            )
+            embed.set_footer(
+                text=f"User ID: {member.id}",
+                icon_url=member.guild.icon.url if member.guild.icon else None,
+            )
 
-                await channel.send(embed=embed)
+            await channel.send(embed=embed)
 
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        channel = self.bot.get_channel(self.member_join_channel_id)
+
+        guild_id = str(member.guild.id)
+        guild_config = self.server_config.get(guild_id, {})
+
+        channel_id = guild_config.get("member_join_channel_id")
+        if not channel_id:
+            return
+        
+        channel = self.bot.get_channel(channel_id)
+        if not channel:
+            return
 
         # bots don't need welcoming, do they?
         if member.bot:
@@ -107,62 +126,72 @@ class Config(commands.Cog):
             # If the user does not allow DMs, pass (400 bad request)
             pass
         
-        try:
-            default_role = discord.utils.get(member.guild.roles, id=self.join_role_id)
-            if default_role:
-                await member.add_roles(default_role)
-        except discord.Forbidden:
-            # If the bot isn't authorized to access server roles
-            # catch the error and pass
-            pass
-
-        if channel:
-            welcomings = [
-                f"Have the waves led you here? {member.mention}", 
-                f"{member.mention} has made it to the server 🌊",
-                f"Glad to have you here! {member.mention}",
-                f"{member.mention} has joined the party 🔥",
-                f"{member.mention} stumbled upon greatness..."
-            ]
-            random_welcoming = random.choice(welcomings)
+        guild_default_role = guild_config.get("join_role_id")
+        if guild_default_role:
+            try:
+                default_role = discord.utils.get(member.guild.roles, id=guild_default_role)
+                if default_role:
+                    await member.add_roles(default_role)
+            except discord.Forbidden:
+                # If the bot isn't authorized to access server roles
+                # catch the error and pass
+                pass
+        welcomings = [
+            f"Have the waves led you here? {member.mention}", 
+            f"{member.mention} has made it to the server 🌊",
+            f"Glad to have you here! {member.mention}",
+            f"{member.mention} has joined the party 🔥",
+            f"{member.mention} stumbled upon greatness..."
+        ]
+        random_welcoming = random.choice(welcomings)
             
-            embed = discord.Embed(
-                title=f"Welcome to {member.guild.name.upper()}",
-                description=random_welcoming,
-                color=0x00A8FF,
-                timestamp=datetime.now(timezone.utc)
-            )
+        embed = discord.Embed(
+            title=f"Welcome to {member.guild.name.upper()}",
+            description=random_welcoming,
+            color=0x00A8FF,
+            timestamp=datetime.now(timezone.utc)
+        )
 
-            embed.set_thumbnail(url=member.display_avatar.url)
-            embed.add_field(
-                name="Account Created", 
-                value=member.created_at.strftime("%Y / %m / %d"), 
-                inline=True
-            )
-            embed.add_field(
-                name="Member Count", 
-                value=f"#{member.guild.member_count}", 
-                inline=True
-            )
-            embed.set_footer(
-                text=f"User ID: {member.id}",
-                icon_url=member.guild.icon.url if member.guild.icon else None,
-            )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(
+            name="Account Created", 
+            value=member.created_at.strftime("%Y / %m / %d"), 
+            inline=True
+        )
+        embed.add_field(
+            name="Member Count", 
+            value=f"#{member.guild.member_count}", 
+            inline=True
+        )
+        embed.set_footer(
+            text=f"User ID: {member.id}",
+            icon_url=member.guild.icon.url if member.guild.icon else None,
+        )
 
-            await channel.send(embed=embed)
+        await channel.send(embed=embed)
 
 
     @commands.command(name="set_welcome")
+    @commands.guild_only()
     async def set_welcome(self, ctx, channel: discord.TextChannel):
+        guild_id = str(ctx.guild.id)
         if ctx.author.guild_permissions.administrator:
             with open(Config.server_data, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                data["member_join_channel_id"] = channel.id
+                server_config = json.load(f)
 
-            with open(Config.server_data, 'w') as f:
-                json.dump(data ,f, indent=4)
-                self.member_join_channel_id = channel.id
-                await ctx.reply(f"Successfully set welcoming channel to {channel.mention}")
+            if guild_id not in server_config:
+                server_config[guild_id] = {
+                "member_join_channel_id": None,
+                "join_role_id": None
+            }
+                    
+            server_config[guild_id]["member_join_channel_id"] = channel.id
+
+            with open(Config.server_data, 'w', encoding='utf-8') as f:
+                json.dump(server_config ,f, indent=4)
+
+            self.server_config = server_config
+            await ctx.reply(f"Successfully set welcoming channel to {channel.mention}")
         else:
             await ctx.reply("You do not have permission to do that.")
 
@@ -177,6 +206,10 @@ class Config(commands.Cog):
         # in case the user doesn't specify a channel (missing argument)
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.reply("Please specify a channel.")
+
+        # in case the user types the command in the bot's DM
+        elif isinstance(error, commands.NoPrivateMessage):
+            await ctx.reply("This command can only be used within servers.")
             
 
 class MyBot(commands.Bot):
