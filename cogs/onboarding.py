@@ -277,6 +277,7 @@ class Config(commands.Cog):
             await ctx.reply("This command can only be used within servers.")
 
 
-class MyBot(commands.Bot):
-    async def setup_hook(self):
-        await self.add_cog(Config(self))
+                            # [Loading Config Cog]
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Config(bot))

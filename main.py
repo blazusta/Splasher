@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from cogs import onboarding
+from discord.ext import commands
 import os, discord, aiohttp, asyncio
 
 load_dotenv()
@@ -9,7 +9,15 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = onboarding.MyBot(command_prefix='!', intents=intents)
+class MyBot(commands.Bot):
+    async def setup_hook(self):
+        await self.load_extension("cogs.onboarding")
+        await self.load_extension("cogs.moderation")
+        
+        await self.tree.sync()
+        print("Slash commands synced successfully.")
+
+bot = MyBot(command_prefix='!', intents=intents)
 
 async def start_bot():
     try:
@@ -38,7 +46,5 @@ async def start_bot():
             await bot.close()
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(start_bot())
-    except KeyboardInterrupt:
-        print("Interrupted by user.")
+    try: asyncio.run(start_bot())  
+    except KeyboardInterrupt: print("Interrupted by user.")
