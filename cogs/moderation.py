@@ -54,5 +54,33 @@ class ModConfig(commands.Cog):
             )
 
 
+
+    @app_commands.command(name="purge", description="Purge all messages sent in the last 14 days.")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def purge_messaged(self, interaction: discord.Interaction):
+        
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # limit=None (delete all)
+            await interaction.channel.purge(limit=None)
+            reply = f"Successfully purged {interaction.channel.mention}"
+
+            await interaction.followup.send(
+                reply,
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "I do not have permission to delete messages in this channel",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.followup.send(
+                f"Failed to delete messages: {e}",
+                ephemeral=True
+            )
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModConfig(bot))
