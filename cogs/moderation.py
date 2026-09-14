@@ -27,8 +27,16 @@ class ModConfig(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            await interaction.channel.purge(limit=amount)
-            reply = f"Successfully deleted {amount} message" if amount == 1 else f"Successfully deleted {amount} messages"
+            deleted = await interaction.channel.purge(limit=amount)
+
+            if not deleted:
+                await interaction.followup.send(
+                    f"{interaction.channel.mention} is empty or has no messages sent in the last 14 days.",
+                    ephemeral=True
+                )
+                return
+            
+            reply = f"Successfully deleted 1 message" if len(deleted) == 1 else f"Successfully deleted {len(deleted)} messages"
             await interaction.followup.send(
                 reply,
                 ephemeral=True
@@ -44,7 +52,6 @@ class ModConfig(commands.Cog):
                 ephemeral=True
             )
 
-
     @clear_messages.error
     async def clear_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
@@ -56,7 +63,7 @@ class ModConfig(commands.Cog):
 
     @app_commands.command(name="purge", description="Purge all messages sent in the last 14 days.")
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def purge_messaged(self, interaction: discord.Interaction):
+    async def purge_messages(self, interaction: discord.Interaction):
         
         await interaction.response.defer(ephemeral=True)
 
@@ -74,7 +81,7 @@ class ModConfig(commands.Cog):
                 return
 
             reply = f"Successfully purged {interaction.channel.mention}"
-            followup_reply = "\n1 message has been deleted." if len(deleted) == 0 else f"\n{len(deleted)} messages have been deleted."
+            followup_reply = "\n1 message has been deleted." if len(deleted) == 1 else f"\n{len(deleted)} messages have been deleted."
             await interaction.followup.send(
                 f"{reply}{followup_reply}",
                 ephemeral=True
@@ -88,6 +95,14 @@ class ModConfig(commands.Cog):
         except discord.HTTPException as e:
             await interaction.followup.send(
                 f"Failed to delete messages: {e}",
+                ephemeral=True
+            )
+
+    @purge_messages.error
+    async def purge_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You need the `Manage Messages` permission to use this command.",
                 ephemeral=True
             )
 
