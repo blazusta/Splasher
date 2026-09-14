@@ -199,6 +199,22 @@ class Config(commands.Cog):
             await ctx.reply("You do not have permission to do that.")
 
 
+    @set_welcome.error
+    async def set_welcome_error(self, ctx, error):
+
+        # in case the user types a non-existant channel
+        if isinstance(error, commands.ChannelNotFound):
+            await ctx.reply("Couldn't find this channel.")
+
+        # in case the user doesn't specify a channel (missing argument)
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.reply("Please specify a channel.")
+
+        # in case the user types the command in the bot's DM
+        elif isinstance(error, commands.NoPrivateMessage):
+            await ctx.reply("This command can only be used within servers.")
+
+
     @commands.command(name="set_role")
     @commands.guild_only()
     async def set_role(self, ctx, role: discord.Role):
@@ -236,26 +252,7 @@ class Config(commands.Cog):
         else:
             await ctx.reply(f"You do not have permission to do that.")
 
-
-                        # [Handle event/command errors and exceptions]
-
-
-    @set_welcome.error
-    async def set_welcome_error(self, ctx, error):
-
-        # in case the user types a non-existant channel
-        if isinstance(error, commands.ChannelNotFound):
-            await ctx.reply("Couldn't find this channel.")
-
-        # in case the user doesn't specify a channel (missing argument)
-        elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.reply("Please specify a channel.")
-
-        # in case the user types the command in the bot's DM
-        elif isinstance(error, commands.NoPrivateMessage):
-            await ctx.reply("This command can only be used within servers.")
             
-
     @set_role.error
     async def set_role_error(self, ctx, error):
 
@@ -277,7 +274,70 @@ class Config(commands.Cog):
             await ctx.reply("This command can only be used within servers.")
 
 
+    @commands.command(name="unset_welcome")
+    @commands.guild_only()
+    async def unset_welcome(self, ctx):
+        if ctx.author.guild_permissions.administrator:
+            guild_id = str(ctx.guild.id)
+
+            with open(Config.server_data, 'r', encoding='utf-8') as f:
+                server_config = json.load(f)
+            
+            current_channel = server_config.get(guild_id, {}).get("member_join_channel_id")
+
+            if current_channel:
+                server_config[guild_id]["member_join_channel_id"] = None
+
+                with open(Config.server_data, 'w', encoding='utf-8') as f:
+                    json.dump(server_config, f, indent=4)
+
+                self.server_config = server_config
+                await ctx.reply(f"Successfully unset welcoming channel.")
+            else:
+                await ctx.reply(f"No channel has been set yet.")
+        else:
+            await ctx.reply(f"You do not have permission to do that.")
+
+
+    @unset_welcome.error
+    async def unset_welcome_error(self, ctx, error):
+        if isinstance(error, commands.NoPrivateMessage):
+            await ctx.reply("This command can only be used in a server.")
+
+
+    @commands.command(name="unset_role")
+    @commands.guild_only()
+    async def unset_role(self, ctx):
+        if ctx.author.guild_permissions.administrator:
+            guild_id = str(ctx.guild.id)
+
+            with open(Config.server_data, 'r', encoding='utf-8') as f:
+                server_config = json.load(f)
+
+                current_role = server_config.get(guild_id, {}).get("join_role_id")
+
+                if current_role:
+                    server_config[guild_id]["join_role_id"] = None
+
+                    with open(Config.server_data, 'w', encoding='utf-8') as f:
+                        json.dump(server_config, f, indent=4)
+
+                    self.server_config = server_config
+                    await ctx.reply(f"Successfully unset default join role.")
+                else:
+                    await ctx.reply(f"No default join role has been set yet.")
+        else:
+            await ctx.reply(f"You do not have permission to do that.")
+
+
+    @unset_role.error
+    async def unset_role_error(self, ctx, error):
+        if isinstance(error, commands.NoPrivateMessage):
+            await ctx.reply(f"This command can only be used in a server.")
+
+
                             # [Loading Config Cog]
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Config(bot))
