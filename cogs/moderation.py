@@ -54,7 +54,6 @@ class ModConfig(commands.Cog):
             )
 
 
-
     @app_commands.command(name="purge", description="Purge all messages sent in the last 14 days.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def purge_messaged(self, interaction: discord.Interaction):
@@ -63,13 +62,24 @@ class ModConfig(commands.Cog):
 
         try:
             # limit=None (delete all)
-            await interaction.channel.purge(limit=None)
-            reply = f"Successfully purged {interaction.channel.mention}"
+            # channel.purge returns a list of message objects that were deleted
+            deleted = await interaction.channel.purge(limit=None)
 
+            # if delete is an empty list
+            if not deleted:
+                await interaction.followup.send(
+                    f"{interaction.channel.mention} is empty or has no messages sent in the last 14 days.",
+                    ephemeral=True
+                )
+                return
+
+            reply = f"Successfully purged {interaction.channel.mention}"
+            followup_reply = "\n1 message has been deleted." if len(deleted) == 0 else f"\n{len(deleted)} messages have been deleted."
             await interaction.followup.send(
-                reply,
+                f"{reply}{followup_reply}",
                 ephemeral=True
             )
+
         except discord.Forbidden:
             await interaction.followup.send(
                 "I do not have permission to delete messages in this channel",
