@@ -108,27 +108,10 @@ class Config(commands.Cog):
         guild_id = str(member.guild.id)
         guild_config = self.server_config.get(guild_id, {})
 
-        channel_id = guild_config.get("member_join_channel_id")
-        if not channel_id:
-            return
-        
-        channel = self.bot.get_channel(channel_id)
-        if not channel:
-            return
-
         # bots don't need welcoming, do they?
         if member.bot:
             return
 
-        try:
-            await member.send(f"Welcome to {member.guild.name.upper()} {member.mention}")
-        except discord.Forbidden:
-            # If the user does not allow DMs, pass (403 forbidden)
-            pass
-        except discord.HTTPException:
-            # If the user does not allow DMs, pass (400 bad request)
-            pass
-        
         guild_default_role = guild_config.get("join_role_id")
         if guild_default_role:
             try:
@@ -139,6 +122,24 @@ class Config(commands.Cog):
                 # If the bot isn't authorized to access server roles
                 # catch the error and pass
                 pass
+
+        try:
+            await member.send(f"Welcome to {member.guild.name.upper()} {member.mention}")
+        except discord.Forbidden:
+            # If the user does not allow DMs, pass (403 forbidden)
+            pass
+        except discord.HTTPException:
+            # If the user does not allow DMs, pass (400 bad request)
+            pass
+
+        channel_id = guild_config.get("member_join_channel_id")
+        if not channel_id:
+            return
+        
+        channel = self.bot.get_channel(channel_id)
+        if not channel:
+            return
+
         welcomings = [
             f"Have the waves led you here? {member.mention}", 
             f"{member.mention} has made it to the server 🌊",

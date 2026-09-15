@@ -8,6 +8,7 @@ class ModConfig(commands.Cog):
         self.bot = bot
 
 
+    @app_commands.guild_only()
     @app_commands.command(name="clear", description="Clear a specified number of messages in this channel")
     @app_commands.describe(amount="The number of messages to delete (between 1 and 100)")
     @app_commands.checks.has_permissions(manage_messages=True)
@@ -61,6 +62,7 @@ class ModConfig(commands.Cog):
             )
 
 
+    @app_commands.guild_only()
     @app_commands.command(name="purge", description="Purge all messages sent in the last 14 days.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def purge_messages(self, interaction: discord.Interaction):
@@ -106,6 +108,48 @@ class ModConfig(commands.Cog):
                 ephemeral=True
             )
 
+
+    @app_commands.guild_only()
+    @app_commands.command(name="slowmode", description="Cooldown timer to prevent spam")
+    @app_commands.describe(time="Specify time in seconds")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def slowmode(
+        self, 
+        interaction: discord.Interaction, 
+        time: app_commands.Range[int, 0, 21600] # 0 to 6h
+    ):
+        try:
+            await interaction.channel.edit(slowmode_delay=time)
+
+            if time == 0:
+                await interaction.response.send_message(
+                    f"Slowmode has been disabled for {interaction.channel.mention}",
+                    ephemeral=True  
+                )
+                return
+            
+            await interaction.response.send_message(
+                f"Slowmode has been set for {interaction.channel.mention}: {time}s",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "I do not have permission to slowmode this channel",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.response.send_message(
+                f"Failed to slowmode channel: {e}",
+                ephemeral=True
+            )
+
+    @slowmode.error
+    async def slowmode_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You need the `Manage Channels` permission to use this command.",
+                ephemeral=True
+            )
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModConfig(bot))
