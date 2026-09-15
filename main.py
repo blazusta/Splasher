@@ -12,7 +12,8 @@ intents.message_content = True
 class MyBot(commands.Bot):
     async def setup_hook(self):
         await self.load_extension("cogs.onboarding")
-        await self.load_extension("cogs.moderation")
+        await self.load_extension("cogs.chat_moderation")
+        await self.load_extension("cogs.member_moderation")
         
         await self.tree.sync()
         print("Slash commands synced successfully.")
