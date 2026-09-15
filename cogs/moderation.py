@@ -82,7 +82,7 @@ class ModConfig(commands.Cog):
                 )
                 return
 
-            reply = f"Successfully purged {interaction.channel.mention}"
+            reply = f"{interaction.channel.mention} has been cleared 🌊"
             followup_reply = "\n1 message has been deleted." if len(deleted) == 1 else f"\n{len(deleted)} messages have been deleted."
             await interaction.followup.send(
                 f"{reply}{followup_reply}",
@@ -150,6 +150,89 @@ class ModConfig(commands.Cog):
                 "You need the `Manage Channels` permission to use this command.",
                 ephemeral=True
             )
+
+
+    @app_commands.guild_only()
+    @app_commands.command(name="lock", description="Prevent @everyone from sending messages in this channel")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def lock_channel(self, interaction: discord.Interaction):
+
+        everyone = interaction.channel.permissions_for(interaction.guild.default_role)
+        if everyone.send_messages:
+            try:
+                await interaction.channel.set_permissions(
+                    interaction.guild.default_role, # @everyone
+                    send_messages=False
+                )
+                await interaction.response.send_message(
+                    f"{interaction.channel.mention} has been locked 🔒",
+                    ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "I do not have the permission to manage permissions for this channel.",
+                    ephemeral=True
+                )
+            except discord.HTTPException as e:
+                await interaction.response.send_message(
+                    f"Failed to lock channel: {e}",
+                    ephemeral=True
+                )
+        else:
+            await interaction.response.send_message(
+                f"{interaction.channel.mention} is already locked!",
+                ephemeral=True
+            )
+
+    @lock_channel.error
+    async def lock_channel_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You need the `Manage Channels` permission to use this command.",
+                ephemeral=True
+            )
+
+
+    @app_commands.guild_only()
+    @app_commands.command(name="unlock", description="Allow @everyone to send messages in this channel")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def unlock_channel(self, interaction: discord.Interaction):
+        
+        everyone = interaction.channel.permissions_for(interaction.guild.default_role)
+        if not everyone.send_messages:
+            try:
+                await interaction.channel.set_permissions(
+                    interaction.guild.default_role,
+                    send_messages=None  # reset this permission to server default value (T/F)
+                )
+                await interaction.response.send_message(
+                    f"{interaction.channel.mention} has been unlocked 🔓",
+                    ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "I do not have the permission to manage permissions for this channel.",
+                    ephemeral=True
+                )
+            except discord.HTTPException as e:
+                await interaction.response.send_message(
+                    f"Failed to unlock channel: {e}",
+                    ephemeral=True
+                )
+        else:
+            await interaction.response.send_message(
+                f"{interaction.channel.mention} is already unlocked!",
+                ephemeral=True
+            )
+
+    @unlock_channel.error
+    async def unlock_channel_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You need the `Manage Channels` permission to use this command.",
+                ephemeral=True
+            )
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModConfig(bot))
