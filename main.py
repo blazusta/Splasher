@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from discord.ext import commands
-import os, discord, aiohttp, asyncio
+import os, discord, aiohttp, asyncio, traceback
 
 load_dotenv()
 BOT_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -21,31 +21,21 @@ class MyBot(commands.Bot):
 bot = MyBot(command_prefix='!', intents=intents)
 
 async def start_bot():
-    try:
-        while True:
+    async with bot:
+        try:
             try:
                 await bot.start(BOT_TOKEN)
 
-            except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-                print(f"Connection Failed: {e}\nRetrying...")
+            except (aiohttp.ClientError, asyncio.TimeoutError, discord.GatewayNotFound) as e:
+                print(f"Connection Failed: {e}")
 
-                # Clear unclosed client session before next connecting attempt
-                if not bot.is_closed():
-                    await bot.close()
-                await asyncio.sleep(10)
-                
-            except Exception as e:
-                print(f"Unexpected Error occurred: {e}")
-                break
+            except Exception:
+                print(f"Unexpected Error occurred:")
+                traceback.print_exc()
 
-    except KeyboardInterrupt:
-        pass
-
-    finally:
-        # Clear unclosed client session before shutting down the bot
-        if not bot.is_closed():
-            await bot.close()
+        except KeyboardInterrupt:
+            pass
 
 if __name__ == '__main__':
     try: asyncio.run(start_bot())  
-    except KeyboardInterrupt: print("Interrupted by user.")
+    except KeyboardInterrupt: print("Bot shut down by user.")
