@@ -90,5 +90,147 @@ class MemberModeration(commands.Cog):
             )
 
 
+    @app_commands.guild_only()
+    @app_commands.command(name="ban", description="Ban a member from your server")
+    @app_commands.describe(
+        member="The member to ban", 
+        delete_messages="Delete their messages from the last (0 - 7) days",
+        reason="Reason for banning"
+    )
+    @app_commands.checks.has_permissions(ban_members=True)
+    async def ban_member(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        delete_messages: app_commands.Range[int, 0, 7] = 0,
+        reason: str = "No reason provided."
+    ):
+        
+        # Hierarchy Validation
+
+        if member == interaction.user:
+            await interaction.response.send_message(
+                "You cannot ban yourself!",
+                ephemeral=True
+            )
+            return
+        
+        if member == interaction.guild.owner:
+            await interaction.response.send_message(
+                "You cannot ban the server owner!",
+                ephemeral=True
+            )
+            return
+        
+        if member.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
+            await interaction.response.send_message(
+                "You cannot ban someone with a higher or equal to your highest role!",
+                ephemeral=True
+            )
+            return
+        
+        if member.top_role >= interaction.guild.me.top_role:
+            await interaction.response.send_message(
+                "I cannot ban someone with a higher or equal to my highest role!",
+                ephemeral=True
+            )
+            return
+        
+        try:
+            await member.send(f"You have been banned from {member.guild.name}\n**Reason:** {reason}\n{member.mention}")
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+        try:
+            await member.ban(
+                delete_message_days=delete_messages, 
+                reason=f"Banned by {interaction.user.name}: {reason}"
+            )
+            await interaction.response.send_message(
+                f"{member.name} has been banned!\n**Reason:** {reason}",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "I do not have the permission to ban this user.",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.response.send_message(
+                f"Failed to ban this user: {e}",
+                ephemeral=True
+            )
+
+    @ban_member.error
+    async def ban_member_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You need the `Ban Members` permission to execute this command.",
+                ephemeral=True
+            )
+
+
+    @app_commands.guild_only()
+    @app_commands.command(name="unban", description="unban a banned member")
+    @app_commands.describe(user_id = "The banned member ID to unban")
+    @app_commands.checks.has_permissions(ban_members=True)
+    async def unban_member(
+        self, 
+        interaction: discord.Interaction,
+        # Discord is built using JavaScript, which has a limit and cannot handle
+        # numbers as big as discord IDs
+        user_id: str, 
+        reason: str = "No reason provided."
+    ):
+        
+        if not user_id.isdigit():
+            await interaction.response.send_message(
+                "Invalid ID!, The ID must contain numbers only.",
+                ephemeral=True
+            )
+            return
+        
+        # Convert the ID to an int
+        user_object = discord.Object(int(user_id))
+
+        try:
+            ban_entry = await interaction.guild.fetch_ban(user_object)
+            banned_user = ban_entry.user
+
+            await interaction.guild.unban(
+                banned_user,
+                reason=f"Unbanned by {interaction.user.name}: {reason}"
+            )
+
+            await interaction.response.send_message(
+                f"{banned_user.name} has been unbanned\n**Reason:** {reason}",
+                ephemeral=True
+            )
+        except discord.NotFound:
+            # if the banned user id was not found within the list of banned users
+            await interaction.response.send_message(
+                "This user is not banned from this server (or ID does not exist)",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "I do not have the permission to unban this user.",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.response.send_message(
+                f"Failed to unban this user: {e}",
+                ephemeral=True
+            )
+
+    @unban_member.error
+    async def unban_member_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "You do not have the `Ban Members` permission to execute this command.",
+                ephemeral=True
+            )
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberModeration(bot))
